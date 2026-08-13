@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EPairvi - Allahabad High Court Mention Management</title>
+  
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- PDF.js Engine for Browser-Side Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 flex flex-col min-h-screen">
+
+  <!-- HEADER NAVBAR -->
+  <header class="bg-indigo-950 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-scale-balanced text-2xl text-amber-400"></i>
+        <div>
+          <h1 class="text-xl font-bold tracking-wide">EPairvi</h1>
+          <p class="text-xs text-indigo-300">Allahabad High Court Case Mention Portal</p>
+        </div>
+      </div>
+      <div id="navUserArea" class="hidden flex items-center space-x-3">
+        <span id="navRoleBadge" class="bg-amber-500 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-full uppercase">Role</span>
+        <span id="navUserName" class="font-medium text-sm hidden md:inline">User Name</span>
+        <button onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded transition">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="max-w-7xl mx-auto p-4 flex-grow w-full">
+
+    <!-- 1. AUTHENTICATION (SIGNUP / LOGIN) -->
+    <div id="authCard" class="max-w-lg mx-auto my-8 bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+      <h2 class="text-2xl font-bold text-center text-slate-900 mb-1">EPairvi Portal</h2>
+      <p class="text-center text-xs text-slate-500 mb-6">High Court Mention Management System</p>
+
+      <!-- Role Selection -->
+      <div class="mb-4">
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Select Role</label>
+        <select id="authRole" onchange="handleRoleUIChange()" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-600 outline-none">
+          <option value="Advocate">Advocate</option>
+          <option value="Registered Clerk">Registered Clerk</option>
+          <option value="Bench Secretary">Bench Secretary</option>
+          <option value="Office Cadre">Office Cadre (Review Officer)</option>
+        </select>
+        <p class="text-[11px] text-amber-700 mt-1 font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> Warning: Your name and role category are permanently locked to your phone number once registered.</p>
+      </div>
+
+      <!-- User Information -->
+      <div class="mb-4">
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Full Name</label>
+        <input type="text" id="authName" placeholder="Enter Full Name" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-600 outline-none">
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Mobile Number</label>
+        <div class="flex">
+          <span class="inline-flex items-center px-3 bg-slate-100 border border-r-0 border-slate-300 text-slate-600 text-sm rounded-l-lg">+91</span>
+          <input type="tel" id="authPhone" placeholder="10 Digit Mobile" class="w-full border border-slate-300 rounded-r-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-600 outline-none">
+        </div>
+      </div>
+
+      <!-- Office Section Field -->
+      <div id="officeSectionBox" class="mb-4 hidden">
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Section Name</label>
+        <input type="text" id="authSection" placeholder="e.g. Writ A Section" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm">
+      </div>
+
+      <!-- Clerk Advocate Linkage Fields -->
+      <div id="clerkBox" class="mb-4 hidden p-3 bg-amber-50 rounded-lg border border-amber-200">
+        <p class="text-xs font-bold text-amber-900 mb-2"><i class="fa-solid fa-user-lock"></i> Advocate Dual OTP Verification Required</p>
+        <input type="text" id="clerkAdvName" placeholder="Advocate's Full Name" class="w-full border border-slate-300 rounded p-2 text-xs mb-2">
+        <div class="flex">
+          <span class="inline-flex items-center px-2 bg-slate-100 border border-r-0 border-slate-300 text-slate-500 text-xs rounded-l">+91</span>
+          <input type="tel" id="clerkAdvPhone" placeholder="Advocate's 10-Digit Mobile" class="w-full border border-slate-300 rounded-r p-2 text-xs">
+        </div>
+      </div>
+
+      <div id="recaptcha-container"></div>
+
+      <button id="btnSendOtp" onclick="initiatePhoneAuth()" class="w-full bg-indigo-900 hover:bg-indigo-950 text-white font-semibold py-2.5 rounded-lg text-sm transition mt-2">
+        Send OTP Code
+      </button>
+
+      <!-- OTP Entry Box -->
+      <div id="otpBox" class="mt-4 pt-4 border-t border-slate-200 hidden">
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1" id="otpLabel">Enter 6-Digit OTP</label>
+        <input type="text" id="otpCode" maxlength="6" placeholder="123456" class="w-full border border-slate-300 rounded-lg p-2.5 text-center text-lg tracking-widest font-bold mb-3">
+        <button onclick="verifyPhoneOtp()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+          Verify OTP & Login
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. ADVOCATE / REGISTERED CLERK DASHBOARD -->
+    <div id="advocateDashboard" class="hidden space-y-6">
+      
+      <!-- Cause List Navigation Proxy -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center">
+          <i class="fa-solid fa-file-pdf text-red-600 mr-2"></i> High Court Cause List Parser
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <label class="block font-bold mb-1">Listing Date</label>
+            <input type="date" id="advDate" class="w-full border rounded p-2">
+          </div>
+          <div>
+            <label class="block font-bold mb-1">Court Number</label>
+            <input type="number" id="advCourtNo" placeholder="e.g. 29" class="w-full border rounded p-2">
+          </div>
+          <div>
+            <label class="block font-bold mb-1">List Type</label>
+            <select id="advListType" class="w-full border rounded p-2">
+              <option value="Fresh List">Fresh List</option>
+              <option value="Daily Cause List">Daily Cause List</option>
+              <option value="Supplementary List">Supplementary List</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold mb-1">Upload / Select PDF File</label>
+            <input type="file" id="pdfFileInput" accept="application/pdf" class="w-full border rounded p-1 text-xs">
+          </div>
+        </div>
+        <button onclick="parseUploadedPdf()" class="mt-3 bg-indigo-900 hover:bg-indigo-950 text-white text-xs font-semibold px-4 py-2 rounded">
+          Parse Cause List PDF
+        </button>
+      </div>
+
+      <!-- Live Search & Mention Selection -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-3 gap-2">
+          <h4 class="font-bold text-slate-900 text-sm">Parsed Cause List Cases</h4>
+          <input type="text" id="pdfCaseSearch" onkeyup="filterParsedCases()" placeholder="Search Sr No, Case No, Party, Advocate..." class="w-full md:w-72 border rounded px-3 py-1.5 text-xs">
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-100 font-bold uppercase text-slate-700">
+              <tr>
+                <th class="p-2 border">Sr No</th>
+                <th class="p-2 border">Case Number</th>
+                <th class="p-2 border">Party Name</th>
+                <th class="p-2 border">Counsel</th>
+                <th class="p-2 border">Action</th>
+              </tr>
+            </thead>
+            <tbody id="parsedCasesTbody" class="divide-y divide-slate-200">
+              <tr><td colspan="5" class="p-4 text-center text-slate-400">Select parameters and upload a Cause List PDF to view cases.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Active Mention Status -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h4 class="font-bold text-slate-900 text-sm mb-3">My Submitted Case Mentions</h4>
+        <div id="advocatesMentionsList" class="space-y-3"></div>
+      </div>
+
+      <!-- Public Court Wise Mention Viewer -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h4 class="font-bold text-slate-900 text-sm mb-3">Public Court-Wise Mention Directory</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+          <input type="number" id="pubCourtFilter" placeholder="Court No" class="border p-1.5 text-xs rounded">
+          <input type="date" id="pubDateFilter" class="border p-1.5 text-xs rounded">
+          <button onclick="loadPublicCourtMentions()" class="bg-slate-800 text-white text-xs px-3 py-1.5 rounded">Filter Public Mentions</button>
+        </div>
+        <div id="publicMentionsList" class="space-y-2 text-xs"></div>
+      </div>
+
+      <!-- GOOGLE ADSENSE BANNER CONTAINER FOR ADVOCATES & CLERKS -->
+      <div id="advocateAdContainer" class="bg-slate-200 border border-dashed border-slate-400 p-3 rounded-xl text-center text-xs text-slate-500">
+        <p class="font-bold text-slate-600 mb-1">Advertisement</p>
+        <div class="min-h-[90px] flex items-center justify-center bg-slate-100 rounded border">
+          <!-- PASTE YOUR GOOGLE ADSENSE CODE HERE -->
+          <span>Google AdSense Banner Slot</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. BENCH SECRETARY DASHBOARD -->
+    <div id="bsDashboard" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex justify-between items-center">
+          <h3 class="text-base font-bold text-slate-900"><i class="fa-solid fa-gavel text-amber-600 mr-2"></i> Bench Secretary Court Console</h3>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold">Assigned Court No:</span>
+            <input type="number" id="bsActiveCourt" onchange="saveBsCourtSetting()" class="w-16 border rounded p-1 text-center font-bold text-xs">
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h4 class="font-bold text-slate-900 text-sm mb-3">Mentions Pending Priority Setup</h4>
+        <div id="bsMentionsQueue" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- 4. OFFICE CADRE (REVIEW OFFICER) DASHBOARD -->
+    <div id="officeDashboard" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-base font-bold text-slate-900 mb-3"><i class="fa-solid fa-building-columns text-indigo-900 mr-2"></i> Review Officer Dispatch Console</h3>
+        
+        <!-- Multi-Select Filters -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs mb-3">
+          <div>
+            <label class="block font-bold mb-1">Court Numbers (Comma Separated)</label>
+            <input type="text" id="roCourtsInput" placeholder="e.g. 12, 15, 29" class="w-full border rounded p-1.5">
+          </div>
+          <div>
+            <label class="block font-bold mb-1">Cause List Types</label>
+            <select id="roListTypeSelect" multiple class="w-full border rounded p-1.5 h-16">
+              <option value="Fresh List">Fresh List</option>
+              <option value="Daily Cause List">Daily Cause List</option>
+              <option value="Supplementary List">Supplementary List</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold mb-1">Priority</label>
+            <select id="roPrioritySelect" class="w-full border rounded p-1.5">
+              <option value="">All Priorities</option>
+              <option value="Topmost Priority">Topmost Priority</option>
+              <option value="High Priority">High Priority</option>
+              <option value="Routine Priority">Routine Priority</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold mb-1">Listing Date</label>
+            <input type="date" id="roDateInput" class="w-full border rounded p-1.5">
+          </div>
+        </div>
+        <button onclick="loadOfficeConsoleData()" class="bg-indigo-900 text-white font-semibold text-xs px-4 py-2 rounded">Apply Filters</button>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h4 class="font-bold text-slate-900 text-sm mb-3">Mentioned Cases Queue (Decreasing Priority)</h4>
+        <div id="officeCasesQueue" class="space-y-3"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- CASE DETAIL POPOVER MODAL -->
+  <div id="caseDetailModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center mb-3">
+        <h3 id="modalCaseNo" class="text-base font-bold text-indigo-900">Case Details</h3>
+        <button onclick="closeCaseDetailModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <p class="font-bold text-slate-500 uppercase">Party Name</p>
+          <p id="modalPartyName" class="text-slate-800 font-medium"></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-500 uppercase">Petitioner Counsel</p>
+          <p id="modalPetitionerCounsel" class="text-slate-800"></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-500 uppercase">Respondent Counsel</p>
+          <p id="modalRespondentCounsel" class="text-slate-800"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MENTION REMARKS DIALOG -->
+  <div id="mentionDialog" class="hidden fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-2">Submit Case Mention</h3>
+      <p id="dialogCaseInfo" class="text-xs text-slate-600 mb-3 bg-slate-50 p-2 rounded border"></p>
+      <textarea id="dialogRemarks" rows="3" placeholder="Enter mention urgency remarks..." class="w-full border rounded p-2 text-xs mb-3 outline-none focus:ring-2 focus:ring-indigo-600"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button onclick="closeMentionDialog()" class="px-3 py-1.5 bg-slate-200 text-xs font-bold rounded">Cancel</button>
+        <button onclick="confirmSubmitMention()" class="px-3 py-1.5 bg-indigo-900 text-white text-xs font-bold rounded">Submit Mention</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ------------------------------------------------------------------
+    // FIREBASE INITIALIZATION CONFIGURATION
+    // ------------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY_HERE",
+      authDomain: "epairvi-web.firebaseapp.com",
+      projectId: "epairvi-web",
+      storageBucket: "epairvi-web.appspot.com",
+      messagingSenderId: "123456789012",
+      appId: "1:123456789012:web:abcdef123456"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUserDoc = null;
+    let confirmationResult = null;
+    let activeParsedCases = [];
+    let selectedCaseForMention = null;
+
+    // Set PDF Worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Default Dates
+    document.getElementById('advDate').valueAsDate = new Date();
+    document.getElementById('roDateInput').valueAsDate = new Date();
+    document.getElementById('pubDateFilter').valueAsDate = new Date();
+
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' });
+
+    // ------------------------------------------------------------------
+    // AUTHENTICATION & PERMANENT ROLE LOCKING
+    // ------------------------------------------------------------------
+    function handleRoleUIChange() {
+      const role = document.getElementById('authRole').value;
+      document.getElementById('clerkBox').classList.toggle('hidden', role !== 'Registered Clerk');
+      document.getElementById('officeSectionBox').classList.toggle('hidden', role !== 'Office Cadre');
+    }
+
+    function initiatePhoneAuth() {
+      const phone = document.getElementById('authPhone').value;
+      if (!phone || phone.length < 10) return alert('Enter a valid 10-digit mobile number');
+
+      auth.signInWithPhoneNumber("+91" + phone, window.recaptchaVerifier)
+        .then((result) => {
+          confirmationResult = result;
+          document.getElementById('otpBox').classList.remove('hidden');
+          alert('OTP sent to +91' + phone);
+        }).catch(err => alert('OTP Error: ' + err.message));
+    }
+
+    function verifyPhoneOtp() {
+      const code = document.getElementById('otpCode').value;
+      confirmationResult.confirm(code).then(res => {
+        completeRegistrationOrLogin(res.user);
+      }).catch(err => alert('Invalid OTP: ' + err.message));
+    }
+
+    async function completeRegistrationOrLogin(user) {
+      const phone = user.phoneNumber;
+      const role = document.getElementById('authRole').value;
+      const fullName = document.getElementById('authName').value || 'User';
+
+      const lockRef = db.collection('permanent_role_locks').doc(phone);
+      const lockDoc = await lockRef.get();
+
+      const newCategory = (role === 'Advocate' || role === 'Registered Clerk') ? 'LEGAL' : 'STAFF';
+
+      if (lockDoc.exists) {
+        if (lockDoc.data().category !== newCategory) {
+          alert(`Security Block: Phone number permanently locked to ${lockDoc.data().category} category.`);
+          auth.signOut();
+          return;
+        }
+      } else {
+        await lockRef.set({ phone, category: newCategory, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+
+      const userRef = db.collection('users').doc(user.uid);
+      const profile = {
+        fullName,
+        phone,
+        role,
+        officeSection: document.getElementById('authSection').value || '',
+        clerkAdvName: document.getElementById('clerkAdvName').value || '',
+        clerkAdvPhone: document.getElementById('clerkAdvPhone').value || '',
+        isBanned: false
+      };
+
+      await userRef.set(profile, { merge: true });
+      loadUserRoleDashboard(profile);
+    }
+
+    function loadUserRoleDashboard(user) {
+      currentUserDoc = user;
+      document.getElementById('authCard').classList.add('hidden');
+      document.getElementById('navUserArea').classList.remove('hidden');
+      document.getElementById('navUserName').innerText = user.fullName;
+      document.getElementById('navRoleBadge').innerText = user.role;
+
+      document.getElementById('advocateDashboard').classList.toggle('hidden', !(user.role === 'Advocate' || user.role === 'Registered Clerk'));
+      document.getElementById('bsDashboard').classList.toggle('hidden', user.role !== 'Bench Secretary');
+      document.getElementById('officeDashboard').classList.toggle('hidden', user.role !== 'Office Cadre');
+
+      if (user.role === 'Advocate' || user.role === 'Registered Clerk') loadAdvocateMentions();
+      if (user.role === 'Bench Secretary') loadBsConsole();
+      if (user.role === 'Office Cadre') loadOfficeConsoleData();
+    }
+
+    function handleLogout() { auth.signOut().then(() => location.reload()); }
+
+    // ------------------------------------------------------------------
+    // CLIENT-SIDE PDF PARSING ENGINE (PDF.js)
+    // ------------------------------------------------------------------
+    async function parseUploadedPdf() {
+      const fileInput = document.getElementById('pdfFileInput');
+      if (!fileInput.files.length) return alert('Select a PDF file first');
+
+      const file = fileInput.files[0];
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      activeParsedCases = [];
+      let fullText = "";
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(" ");
+        fullText += " " + pageText;
+      }
+
+      // Regex matching for Case Entries
+      const caseRegex = /(\d+)\s+([A-Z0-9\/\-\s]+?)\s+VS\s+([A-Z0-9\/\-\.\s]+?)(?=\s\d+\s+[A-Z0-9\/]+|\s*$)/g;
+      let match;
+      let count = 1;
+
+      while ((match = caseRegex.exec(fullText)) !== null && count <= 50) {
+        activeParsedCases.push({
+          srNo: match[1] || count.toString(),
+          caseNo: (match[2] || "WRIA/1000/2026").trim().substring(0, 30),
+          partyName: (match[3] || "PETITIONER Vs STATE OF UP").trim().substring(0, 80),
+          counsel: "ADVOCATE COUNSEL"
+        });
+        count++;
+      }
+
+      renderParsedCasesTable(activeParsedCases);
+    }
+
+    function renderParsedCasesTable(cases) {
+      const tbody = document.getElementById('parsedCasesTbody');
+      tbody.innerHTML = '';
+
+      cases.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50";
+        tr.innerHTML = `
+          <td class="p-2 border font-bold">${c.srNo}</td>
+          <td class="p-2 border font-semibold text-indigo-900 cursor-pointer" onclick="showCaseDetailModal('${c.caseNo}', '${c.partyName}', '${c.counsel}', 'C.S.C.')">${c.caseNo}</td>
+          <td class="p-2 border">${c.partyName}</td>
+          <td class="p-2 border text-slate-500">${c.counsel}</td>
+          <td class="p-2 border">
+            <button onclick="openMentionDialog('${c.srNo}', '${c.caseNo}', '${c.partyName}', '${c.counsel}')" class="bg-indigo-900 text-white px-2 py-1 rounded text-xs font-semibold">Mention</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterParsedCases() {
+      const q = document.getElementById('pdfCaseSearch').value.toLowerCase();
+      const filtered = activeParsedCases.filter(c => 
+        c.srNo.includes(q) || c.caseNo.toLowerCase().includes(q) || c.partyName.toLowerCase().includes(q)
+      );
+      renderParsedCasesTable(filtered);
+    }
+
+    // ------------------------------------------------------------------
+    // MENTION SUBMISSION & DASHBOARD UPDATES
+    // ------------------------------------------------------------------
+    function openMentionDialog(srNo, caseNo, partyName, counsel) {
+      selectedCaseForMention = { srNo, caseNo, partyName, counsel };
+      document.getElementById('dialogCaseInfo').innerText = `Sr: ${srNo} | ${caseNo} | ${partyName}`;
+      document.getElementById('mentionDialog').classList.remove('hidden');
+    }
+
+    function closeMentionDialog() { document.getElementById('mentionDialog').classList.add('hidden'); }
+
+    async function confirmSubmitMention() {
+      const remarks = document.getElementById('dialogRemarks').value;
+      const courtNumber = parseInt(document.getElementById('advCourtNo').value || 29);
+      const causeListType = document.getElementById('advListType').value;
+      const listingDate = document.getElementById('advDate').value;
+
+      await db.collection('mentions').add({
+        courtNumber,
+        causeListType,
+        listingDate,
+        serialNumber: selectedCaseForMention.srNo,
+        caseNumber: selectedCaseForMention.caseNo,
+        partyName: selectedCaseForMention.partyName,
+        petitionerCounsel: selectedCaseForMention.counsel,
+        respondentCounsel: 'C.S.C.',
+        remarks,
+        mentionedByName: currentUserDoc.fullName,
+        mentionedByRole: currentUserDoc.role,
+        mentionedByPhone: currentUserDoc.phone,
+        priority: 'Routine Priority',
+        bsVerified: false,
+        status: 'Under Search',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      closeMentionDialog();
+      alert('Case mentioned successfully!');
+      loadAdvocateMentions();
+    }
+
+    function loadAdvocateMentions() {
+      db.collection('mentions').where('mentionedByPhone', '==', currentUserDoc.phone).onSnapshot(snap => {
+        const list = document.getElementById('advocatesMentionsList');
+        list.innerHTML = '';
+        snap.forEach(doc => {
+          const m = doc.data();
+          list.innerHTML += renderMentionCard(m);
+        });
+      });
+    }
+
+    function renderMentionCard(m) {
+      return `
+        <div class="p-3 bg-slate-50 border rounded-lg text-xs flex justify-between items-center">
+          <div>
+            <span class="font-bold text-slate-900">Court ${m.courtNumber} | ${m.causeListType}</span>
+            <p>Sr: ${m.serialNumber} | <strong class="text-indigo-900 cursor-pointer" onclick="showCaseDetailModal('${m.caseNumber}', '${m.partyName}', '${m.petitionerCounsel}', '${m.respondentCounsel}')">${m.caseNumber}</strong></p>
+            <p class="text-slate-500">Mentioned by: ${m.mentionedByName} (${m.mentionedByRole})</p>
+            <p class="text-indigo-800">Remarks: ${m.remarks || 'None'}</p>
+          </div>
+          <div class="text-right">
+            <span class="px-2 py-0.5 rounded font-bold ${m.status === 'Dispatched to Court' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${m.status}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Modal Popover
+    function showCaseDetailModal(caseNo, party, pet, resp) {
+      document.getElementById('modalCaseNo').innerText = caseNo;
+      document.getElementById('modalPartyName').innerText = party;
+      document.getElementById('modalPetitionerCounsel').innerText = pet;
+      document.getElementById('modalRespondentCounsel').innerText = resp;
+      document.getElementById('caseDetailModal').classList.remove('hidden');
+    }
+
+    function closeCaseDetailModal() { document.getElementById('caseDetailModal').classList.add('hidden'); }
+
+    // ------------------------------------------------------------------
+    // BENCH SECRETARY CONSOLE
+    // ------------------------------------------------------------------
+    function loadBsConsole() {
+      const court = localStorage.getItem('bs_court') || 29;
+      document.getElementById('bsActiveCourt').value = court;
+      fetchBsMentions();
+    }
+
+    function saveBsCourtSetting() {
+      localStorage.setItem('bs_court', document.getElementById('bsActiveCourt').value);
+      fetchBsMentions();
+    }
+
+    function fetchBsMentions() {
+      const court = parseInt(document.getElementById('bsActiveCourt').value);
+      db.collection('mentions').where('courtNumber', '==', court).onSnapshot(snap => {
+        const queue = document.getElementById('bsMentionsQueue');
+        queue.innerHTML = '';
+        snap.forEach(doc => {
+          const m = doc.data();
+          const id = doc.id;
+          queue.innerHTML += `
+            <div class="p-3 bg-slate-50 border rounded-lg text-xs flex justify-between items-center">
+              <div>
+                <p class="font-bold">${m.caseNumber} (Sr: ${m.serialNumber})</p>
+                <p class="text-slate-500">By: ${m.mentionedByName} (${m.mentionedByRole})</p>
+              </div>
+              <div class="space-x-2">
+                <select onchange="updateBsPriority('${id}', this.value)" class="border p-1 rounded text-xs">
+                  <option value="Routine Priority" ${m.priority === 'Routine Priority' ? 'selected' : ''}>Routine Priority</option>
+                  <option value="High Priority" ${m.priority === 'High Priority' ? 'selected' : ''}>High Priority</option>
+                  <option value="Topmost Priority" ${m.priority === 'Topmost Priority' ? 'selected' : ''}>Topmost Priority</option>
+                </select>
+              </div>
+            </div>
+          `;
+        });
+      });
+    }
+
+    async function updateBsPriority(id, priority) { await db.collection('mentions').doc(id).update({ priority }); }
+
+    // ------------------------------------------------------------------
+    // OFFICE CADRE CONSOLE
+    // ------------------------------------------------------------------
+    function loadOfficeConsoleData() {
+      db.collection('mentions').onSnapshot(snap => {
+        const queue = document.getElementById('officeCasesQueue');
+        queue.innerHTML = '';
+        snap.forEach(doc => {
+          const m = doc.data();
+          const id = doc.id;
+          queue.innerHTML += `
+            <div class="p-3 bg-white border-l-4 ${m.priority === 'Topmost Priority' ? 'border-l-red-600' : 'border-l-indigo-900'} border rounded shadow-sm text-xs flex justify-between items-center">
+              <div>
+                <p class="font-bold text-slate-900">Court ${m.courtNumber} | ${m.causeListType}</p>
+                <p>Sr: ${m.serialNumber} | <strong class="text-indigo-900 cursor-pointer" onclick="showCaseDetailModal('${m.caseNumber}', '${m.partyName}', '${m.petitionerCounsel}', '${m.respondentCounsel}')">${m.caseNumber}</strong></p>
+                <p class="text-slate-500">Mentioned By: ${m.mentionedByName} (${m.mentionedByRole}) | Mobile: ${m.mentionedByPhone}</p>
+              </div>
+              <div class="space-x-1">
+                <button onclick="updateRoStatus('${id}', 'Under Search')" class="bg-amber-600 text-white px-2 py-1 rounded">Under Search</button>
+                <button onclick="updateRoStatus('${id}', 'Traced')" class="bg-blue-600 text-white px-2 py-1 rounded">Traced</button>
+                <button onclick="updateRoStatus('${id}', 'Dispatched to Court')" class="bg-emerald-600 text-white px-2 py-1 rounded">Dispatched</button>
+              </div>
+            </div>
+          `;
+        });
+      });
+    }
+
+    async function updateRoStatus(id, status) { await db.collection('mentions').doc(id).update({ status }); }
+  </script>
+</body>
+</html>
